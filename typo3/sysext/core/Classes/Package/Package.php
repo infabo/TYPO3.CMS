@@ -343,7 +343,31 @@ class Package extends \TYPO3\Flow\Package\Package implements PackageInterface {
 		// typo3 is included in the list because it's a meta package and not supported for now.
 		// typo3/cms is included since it's basically a container and cannot be detected at runtime.
 		// composer/installers is included until extensionmanager can handle composer packages natively
-		return preg_match('/^(php(-64bit)?|ext-[^\/]+|lib-(curl|iconv|libxml|openssl|pcre|uuid|xsl)|typo3|typo3\/cms|composer\/installers)$/', $requirement) !== 1;
+		$pattern = '/^(php(-64bit)?|ext-[^\/]+|lib-(curl|iconv|libxml|openssl|pcre|uuid|xsl)|typo3|typo3\/cms|composer\/installers)$/';
+		if (preg_match($pattern, $requirement) === 1) {
+			return false;
+		}
+
+		// Determine non typo3-cms-extension packages installed by composer
+		static $composerInstalledPackages = NULL;
+		if ($composerInstalledPackages === NULL) {
+			$composerInstalledPackages = array();
+			$composerLockFile = PATH_site . '../composer.lock';
+			if (file_exists($composerLockFile)) {
+				$composerLock = json_decode(file_get_contents($composerLockFile));
+				if ($composerLock) {
+					foreach ($composerLock->packages as $package) {
+						if ($package->type !== 'typo3-cms-extension') {
+							$composerInstalledPackages[$package->name] = 1;
+						}
+					}
+				}
+			}
+		}
+
+		// Say that package is no composer package if it is a non typo3-cms-extension
+		// composer package in order to bypass it in \TYPO3\Flow\Package\Package::getPackageMetaData
+		return !array_key_exists($requirement, $composerInstalledPackages);
 	}
 
 
